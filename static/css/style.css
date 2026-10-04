@@ -3,8 +3,13 @@ body {
 }
 
 .dropzone-active {
-    border-color: #004cd8 !important;
-    background-color: rgba(239, 68, 68, 0.05) !important;
+    border-color: #19a4db !important;
+    background-color: rgba(25, 164, 219, 0.05) !important;
+}
+
+.page-card-deleted {
+    opacity: 0.3;
+    border-color: #ef4444 !important;
 }
 
 ::-webkit-scrollbar {
