@@ -1,6 +1,8 @@
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 let activeMode = 'merge';
+let pagesToDelete = new Set();
+
 const fileInput = document.getElementById('file-input');
 const fileLabel = document.getElementById('file-label');
 const fileSublabel = document.getElementById('file-sublabel');
@@ -13,10 +15,15 @@ const metaCount = document.getElementById('meta-count');
 
 function switchMode(mode) {
     activeMode = mode;
-    ['merge', 'split', 'img'].forEach(m => {
+    pagesToDelete.clear();
+
+    const modes = ['merge', 'split', 'delete', 'pdf2img', 'pdf2ppt', 'img2pdf'];
+    modes.forEach(m => {
         const btn = document.getElementById(`mode-${m}-btn`);
-        btn.className = 'py-2.5 rounded-lg font-semibold transition-all ' + 
-            (m === mode ? 'text-white bg-red-600' : 'text-zinc-400 hover:text-white');
+        if (btn) {
+            btn.className = 'py-2 rounded-lg font-semibold transition-all ' + 
+            (m === mode ? 'text-white bg-[#004cd8]' : 'text-zinc-400 hover:text-white');
+        }
     });
 
     fileInput.value = '';
@@ -32,7 +39,12 @@ function switchMode(mode) {
         fileInput.accept = 'application/pdf';
         fileSublabel.innerText = 'Select 1 PDF file to extract pages';
         splitControls.classList.remove('hidden');
-    } else if (mode === 'img') {
+    } else if (mode === 'delete' || mode === 'pdf2img' || mode === 'pdf2ppt') {
+        fileInput.multiple = false;
+        fileInput.accept = 'application/pdf';
+        fileSublabel.innerText = mode === 'delete' ? 'Click pages in canvas to mark for deletion' : 'Select 1 PDF file to convert';
+        splitControls.classList.add('hidden');
+    } else if (mode === 'img2pdf') {
         fileInput.multiple = true;
         fileInput.accept = 'image/png, image/jpeg, image/jpg';
         fileSublabel.innerText = 'Select JPG or PNG images';
@@ -65,10 +77,11 @@ async function renderPDFThumbnails(file) {
         const viewport = page.getViewport({ scale: 0.25 });
 
         const card = document.createElement('div');
-        card.className = 'bg-zinc-900 border border-zinc-800 rounded-lg p-2 flex flex-col items-center';
+        card.id = `page-card-${i}`;
+        card.className = 'bg-zinc-900 border border-zinc-800 rounded-lg p-2 flex flex-col items-center cursor-pointer transition-all hover:border-[#19a4db]';
 
         const canvas = document.createElement('canvas');
-        canvas.className = 'rounded border border-zinc-800 w-full h-auto';
+        canvas.className = 'rounded border border-zinc-800 w-full h-auto pointer-events-none';
         const ctx = canvas.getContext('2d');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
@@ -76,11 +89,24 @@ async function renderPDFThumbnails(file) {
         await page.render({ canvasContext: ctx, viewport }).promise;
 
         const label = document.createElement('span');
-        label.className = 'text-[10px] font-mono text-zinc-400 mt-2';
+        label.className = 'text-[10px] font-mono text-zinc-400 mt-2 pointer-events-none';
         label.innerText = `Page ${i}`;
 
         card.appendChild(canvas);
         card.appendChild(label);
+
+        card.addEventListener('click', () => {
+            if (activeMode === 'delete') {
+                if (pagesToDelete.has(i)) {
+                    pagesToDelete.delete(i);
+                    card.classList.remove('page-card-deleted');
+                } else {
+                    pagesToDelete.add(i);
+                    card.classList.add('page-card-deleted');
+                }
+            }
+        });
+
         pageGrid.appendChild(card);
     }
 }
@@ -91,11 +117,10 @@ fileInput.addEventListener('change', async (e) => {
 
     fileLabel.innerText = `${files.length} file(s) selected`;
 
-    if (activeMode === 'split') {
+    if (['split', 'delete', 'pdf2img', 'pdf2ppt'].includes(activeMode)) {
         await renderPDFThumbnails(files[0]);
     }
 });
-
 
 ['dragenter', 'dragover'].forEach(eventName => {
     dropZone.addEventListener(eventName, (e) => {
